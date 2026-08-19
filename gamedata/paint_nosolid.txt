@@ -9,6 +9,23 @@
                 "library"    "engine"
                 "windows"    "\x0F\x84\x94\x00\x00\x00\x8D\x8D\x58\xFF\xFF\xFF"
             }
+
+            // "**displacement**"
+            "CM_TraceToLeaf_POINT disp contents check  Patch"
+            {
+                "library"    "engine"
+                "windows"    "\x74\x7A\x8B\x45\xFC"
+            }
+            "CDispCollTree::AABBTree_Ray raytest flag check Patch"
+            {
+                "library"    "engine"
+                "windows"    "\x75\x60\xF7\x41\x20\x81\x40\x00\x00"
+            }
+            "CDispCollTree::AABBTree_Ray contents check Patch"
+            {
+                "library"    "engine"
+                "windows"    "\x74\x57\x8B\x75\x10"
+            }
         }
     }
 }
