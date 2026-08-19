@@ -24,6 +24,7 @@
 
 #define PLUGIN_VERSION      "1.0.0"
 
+
 /* Colour name, material name */
 char g_cPaintColours[][][64] = // Modify this to add/change colours
 {
@@ -106,6 +107,98 @@ public Plugin myinfo =
 	url         = "https://github.com/L0jk4/paint_nosolid"
 };
 
+
+
+/*
+template <bool IS_POINT>
+void FASTCALL CM_TraceToLeaf( TraceInfo_t * RESTRICT pTraceInfo, int ndxLeaf, float startFrac, float endFrac )
+{
+...
+	// only collide with objects you are interested in
+	if( !( pDispBounds->GetContents() & pTraceInfo->m_contents ) )    <--------------------------- patch1
+		continue;
+...
+}
+
+bool CDispCollTree::AABBTree_Ray( const Ray_t &ray, const Vector &vecInvDelta, CBaseTrace *pTrace, bool bSide )
+{
+	VPROF("AABBTree_Ray");
+
+//	VPROF_BUDGET( "DispRayTraces", VPROF_BUDGETGROUP_DISP_RAYTRACES );
+
+	// Check for ray test.
+	if ( CheckFlags( CCoreDispInfo::SURF_NORAY_COLL ) ) return false; <--------------------------- patch2
+
+	// Check for opacity.
+	if ( !( m_nContents & MASK_OPAQUE ) ) return false;               <--------------------------- patch3
+
+	// Pre-calc the inverse delta for perf.
+	CDispCollTri *pImpactTri = NULL;
+
+	AABBTree_TreeTrisRayTest( ray, vecInvDelta, DISPCOLL_ROOTNODE_INDEX, pTrace, bSide, &pImpactTri );
+
+	if ( pImpactTri )
+	{
+		// Collision.
+		VectorCopy( pImpactTri->m_vecNormal, pTrace->plane.normal );
+		pTrace->plane.dist = pImpactTri->m_flDist;
+		pTrace->dispFlags = pImpactTri->m_uiFlags;
+		return true;
+	}
+
+	// No collision.
+	return false;
+}
+
+*/
+
+void PatchDisplacementTrace(bool unpatch = false)
+{
+	static bool tried_to_initialize = false, initialized = false;
+	static Address patch1, patch2, patch3;
+
+	if (!tried_to_initialize)
+	{
+		tried_to_initialize = true;
+    	GameData hGameData = new GameData("paint_nosolid");
+		if (hGameData == null)
+		{
+			PrintToServer("Failed to load gamedata/paint_nosolid.txt");
+			delete hGameData;
+			return;
+		}
+
+		patch1 = hGameData.GetMemSig("CM_TraceToLeaf_POINT disp contents check  Patch");
+		if (patch1 == Address_Null)
+		{
+			PrintToServer("Failed to find signature 'CM_TraceToLeaf_POINT disp contents check  Patch'");
+			delete hGameData;
+			return;
+		}
+		patch2 = hGameData.GetMemSig("CDispCollTree::AABBTree_Ray raytest flag check Patch");
+		if (patch2 == Address_Null)
+		{
+			PrintToServer("Failed to find signature 'CDispCollTree::AABBTree_Ray raytest flag check Patch'");
+			delete hGameData;
+			return;
+		}
+		patch3 = hGameData.GetMemSig("CDispCollTree::AABBTree_Ray contents check Patch");
+		if (patch3 == Address_Null)
+		{
+			PrintToServer("Failed to find signature 'CDispCollTree::AABBTree_Ray contents check Patch'");
+			delete hGameData;
+			return;
+		}
+		initialized = true;
+	}
+
+	if (!initialized) return;
+
+	StoreToAddress(patch1, unpatch ? 0x7A74 : 0x9090, NumberType_Int16);
+	StoreToAddress(patch2, unpatch ? 0x6075 : 0x9090, NumberType_Int16);
+	StoreToAddress(patch3, unpatch ? 0x5774 : 0x9090, NumberType_Int16);
+}
+
 public void OnPluginStart()
 {
 	// patch CStaticProp::InsertPropIntoKDTree
@@ -133,6 +226,7 @@ public void OnPluginStart()
     else
 	{
 		Address addr = hGameData.GetMemSig("CStaticProp::InsertPropIntoKDTree Patch");
+
 		
 		if (addr == Address_Null)
 		{
@@ -145,6 +239,7 @@ public void OnPluginStart()
 			
 			PrintToServer("Patched engine.dll - JZ instruction NOP'd, WINDOWS ONLY!");
 		}
+
 		delete hGameData;
 	}
 
@@ -177,7 +272,7 @@ public void OnPluginStart()
 	HookEvent( "player_spawn", Event_PlayerSpawn );
 
 	CreateTimer( 0.05, Timer_Paint,   _, TIMER_REPEAT);
-	CreateTimer( 0.15, Timer_Flicker, _, TIMER_REPEAT);
+	CreateTimer( 0.35, Timer_Flicker, _, TIMER_REPEAT);
 
 	AutoExecConfig( true, "paint" );
 
@@ -444,7 +539,9 @@ void DoPaint( int client )
 	}
 	else
 	{
-		Handle tr = TR_TraceRayFilterEx( pos, angles, MASK_SHOT, RayType_Infinite, TraceFilter_NoPlayers, client );
+		PatchDisplacementTrace(false);
+		Handle tr = TR_TraceRayFilterEx( pos, angles, MASK_ALL, RayType_Infinite, TraceFilter_NoPlayers, client );
+		PatchDisplacementTrace(true);
 
 		if( !TR_DidHit( tr ) )
 		{
@@ -519,7 +616,7 @@ void SendDecal( int index, const float origin[3], const float start[3], int enti
  */
 bool TraceBrushEntity( int entity, const float pos[3], const float angles[3], float origin[3] )
 {
-	TR_ClipRayToEntity( pos, angles, MASK_SHOT, RayType_Infinite, entity );
+	TR_ClipRayToEntity( pos, angles, MASK_ALL, RayType_Infinite, entity );
 
 	if( !TR_DidHit() )
 		return false;
