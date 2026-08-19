@@ -20,7 +20,7 @@ It shouldn't have a significant impact on server performance, as they are still 
 
  In target mode, the plugin redirects paint towards the selected entity by overriding `m_nEntity` and `m_nHitbox` in  `Entity Decal`. 
  
- For brush models or world `m_vecOrigin` requires an exact collision point, because the engine finds the surface to paint on by going through the map's BSP tree.  `TR_ClipRayToEntity`, allows us to do this as it doesn't have non-solid flags checks.
+ For brush models or world `m_vecOrigin` requires an exact collision point, because the engine finds the surface to paint on by going through the map's BSP tree.  `TR_ClipRayToEntity`, allows us to get that, as it doesn't have non-solid flags checks.
  
  For studio models decals are projected onto the model's meshes, so `m_vecOrigin` is simply set to a point `g_cvStudioDist` units in front of the player's eyes.
 
