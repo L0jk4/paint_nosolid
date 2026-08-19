@@ -520,30 +520,15 @@ void SendDecal( int index, const float origin[3], const float start[3], int enti
  */
 bool TraceBrushEntity( int entity, const float pos[3], const float angles[3], float origin[3] )
 {
-	int  solidType  = GetEntProp( entity, Prop_Send, "m_nSolidType" );
-	int  solidFlags = GetEntProp( entity, Prop_Send, "m_usSolidFlags" );
-	bool restore    = false;
-
-	if( solidType == 0 || ( solidFlags & FSOLID_NOT_SOLID ) )
-	{
-		SetEntProp( entity, Prop_Send, "m_nSolidType",   SOLID_BSP );
-		SetEntProp( entity, Prop_Send, "m_usSolidFlags", solidFlags & ~FSOLID_NOT_SOLID );
-		restore = true;
-	}
-
 	TR_ClipRayToEntity( pos, angles, MASK_SHOT, RayType_Infinite, entity );
 
-	bool hit = TR_DidHit();
-	if( hit )
-		TR_GetEndPosition( origin );
-
-	if( restore )
+	if( !TR_DidHit() )
+		return false;
+	else
 	{
-		SetEntProp( entity, Prop_Send, "m_nSolidType",   solidType  );
-		SetEntProp( entity, Prop_Send, "m_usSolidFlags", solidFlags );
+		TR_GetEndPosition( origin );
+		return true;
 	}
-
-	return hit;
 }
 
 public bool TraceFilter_NoPlayers( int entity, int mask, any data )
