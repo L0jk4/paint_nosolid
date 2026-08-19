@@ -157,6 +157,14 @@ void PatchDisplacementTrace(bool unpatch = false)
 	static bool tried_to_initialize = false, initialized = false;
 	static Address patch1, patch2, patch3;
 
+	if (initialized) 
+	{
+		StoreToAddress(patch1, unpatch ? 0x7A74 : 0x9090, NumberType_Int16);
+		StoreToAddress(patch2, unpatch ? 0x6075 : 0x9090, NumberType_Int16);
+		StoreToAddress(patch3, unpatch ? 0x5774 : 0x9090, NumberType_Int16);
+		return;
+	}
+
 	if (!tried_to_initialize)
 	{
 		tried_to_initialize = true;
@@ -189,14 +197,12 @@ void PatchDisplacementTrace(bool unpatch = false)
 			delete hGameData;
 			return;
 		}
+		delete hGameData;
 		initialized = true;
+		StoreToAddress(patch1, unpatch ? 0x7A74 : 0x9090, NumberType_Int16);
+		StoreToAddress(patch2, unpatch ? 0x6075 : 0x9090, NumberType_Int16);
+		StoreToAddress(patch3, unpatch ? 0x5774 : 0x9090, NumberType_Int16);
 	}
-
-	if (!initialized) return;
-
-	StoreToAddress(patch1, unpatch ? 0x7A74 : 0x9090, NumberType_Int16);
-	StoreToAddress(patch2, unpatch ? 0x6075 : 0x9090, NumberType_Int16);
-	StoreToAddress(patch3, unpatch ? 0x5774 : 0x9090, NumberType_Int16);
 }
 
 public void OnPluginStart()
