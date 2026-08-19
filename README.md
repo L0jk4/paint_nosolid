@@ -10,17 +10,17 @@ For non-solid static props to be visible to `TR_EnumerateEntities` a patch is re
  ## Concept
 
  ### Baseline (free aim mode)
- `+paint` command performs a trace forward and sends an `Entity Decal` temporary entity to the client, which works for visible solid world, static props, dynamic props, func_brushes.
+ `+paint` command performs a trace forward and sends an `Entity Decal` temporary entity to the client, which works for pretty much everything visible and solid.
 
  ### Non-solids (target mode)
 
- The plugin utilises `TR_EnumerateEntities` to find entities in front of the client, then they are presented as list of selectable targets in a menu.
+ The plugin utilises `TR_EnumerateEntities` to find entities in front of the client, then they are presented as a list of selectable targets in a menu.
 
  After an entity is selected, it flickers via `SetTransmit`, allowing the client to see what they selected (not implemented for static props).
 
  In target mode, the plugin redirects paint towards the selected entity by overriding `m_nEntity` and `m_nHitbox` in  `Entity Decal`. 
  
- For brush models or world `m_vecOrigin` requires an exact collision point, because the engine finds the surface to paint on by going through the map's BSP tree.  `TR_ClipRayToEntity`, allows us to get that, as it doesn't have non-solid flags checks.
+ For world and brush models `m_vecOrigin` requires an exact collision point, because the engine finds the surface to paint on by going through the map's BSP tree.  `TR_ClipRayToEntity` allows us to get that, as it doesn't have non-solid flags checks.
  
  For studio models decals are projected onto the model's meshes, so `m_vecOrigin` is simply set to a point `g_cvStudioDist` units in front of the player's eyes.
 
