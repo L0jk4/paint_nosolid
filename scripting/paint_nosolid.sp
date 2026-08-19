@@ -102,8 +102,8 @@ ConVar g_cvStudioDist;
 
 public Plugin myinfo =
 {
-	name        = "Paint",
-	author      = "you",
+	name        = "Paint (Nosolids)",
+	author      = "Lojka",
 	description = "Paint decals on the world and on (nonsolid) entities",
 	version     = PLUGIN_VERSION,
 	url         = ""
@@ -125,11 +125,11 @@ public void OnPluginStart()
 	PARTITION_ENGINE_SOLID_EDICTS | PARTITION_ENGINE_STATIC_PROPS, 
 	mins, maxs );
 	*/
-    GameData hGameData = new GameData("paint_claude");
+    GameData hGameData = new GameData("paint_nosolid");
     
     if (hGameData == null)
     {
-        PrintToServer("Failed to load gamedata/paint_claude.txt");
+        PrintToServer("Failed to load gamedata/paint_nosolid.txt");
     }
     else
 	{
