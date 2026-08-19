@@ -2,7 +2,7 @@ https://github.com/user-attachments/assets/9d245fb5-caf9-4ea1-a460-658b5616cb4a
 
 # Description
 
-A *proof of concept* SourceMod plugin made with Claude based on my idea. It allows players to paint even on non-solid objects such as triggers, static props, dynamic props, func_brush entities, etc.
+A *proof of concept* SourceMod plugin made with Claude based on my idea. It allows players to paint even on non-solid objects such as displacements, triggers, static props, dynamic props, func_brush entities, etc.
 
 ## Note
 For non-solid static props to be visible to `TR_EnumerateEntities` a patch is required, which is implemented only for x86 Windows Counter-Strike: Source. It shouldn't have a significant impact on server performance, since they will still be filtered out rather early in the collision pipeline.
@@ -24,13 +24,14 @@ For non-solid static props to be visible to `TR_EnumerateEntities` a patch is re
  
  For studio models decals are projected onto the model's meshes, so `m_vecOrigin` is simply set to a point `g_cvStudioDist` units in front of the player's eyes.
 
+ For non-solid displacements patch contents and raytest flag checks when painting.
+
  ### Save/load
 
  Automatic save and load are implemented by Claude, which I haven't really checked yet. It should utilise `m_iHammerID` for entities and `m_nHitbox` for static props, which might not be 100% consistent. 
 
 ## TODO
 - For non-solid world brushes we must get a collision point from somewhere else, which might be a trigger or something else non-solid
-- For non-solid displacements make a patch that would dismiss no ray collision flag when tracing
 - For static props highlighting make a single dynamic prop. When highlighting send dynamic prop's model, origin, size*1.01, color via `sendproxy` to the client. 
 
 ## Open questions
