@@ -1,0 +1,14 @@
+"Games"
+{
+    "cstrike"
+    {
+        "Signatures"
+        {
+            "CStaticProp::InsertPropIntoKDTree Patch"
+            {
+                "library"    "engine"
+                "windows"    "\x0F\x84\x94\x00\x00\x00\x8D\x8D\x58\xFF\xFF\xFF"
+            }
+        }
+    }
+}

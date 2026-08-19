@@ -1,0 +1,11 @@
+"UnlitGeneric"
+{
+    "$basetexture" "decals/paint/paint_decal"
+	$detail "Plaster/Wallpaper002a"
+	$detailscale "1.0"
+	$detailblendmode 1 
+    "$decal" 1
+    "$decalscale" 0.14
+    "$translucent" 1
+	"$color" "{255 255 255}"
+}
