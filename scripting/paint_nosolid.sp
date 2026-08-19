@@ -24,9 +24,6 @@
 
 #define PLUGIN_VERSION      "1.0.0"
 
-#define FSOLID_NOT_SOLID    0x0004
-#define SOLID_BSP           2
-
 /* Colour name, material name */
 char g_cPaintColours[][][64] = // Modify this to add/change colours
 {
@@ -106,7 +103,7 @@ public Plugin myinfo =
 	author      = "Lojka",
 	description = "Paint decals on the world and on (nonsolid) entities",
 	version     = PLUGIN_VERSION,
-	url         = ""
+	url         = "https://github.com/L0jk4/paint_nosolid"
 };
 
 public void OnPluginStart()
@@ -115,15 +112,17 @@ public void OnPluginStart()
 	/*
 	void CStaticProp::InsertPropIntoKDTree()
 	{
-	Assert( m_Partition == PARTITION_INVALID_HANDLE );
-	if ( m_nSolidType == SOLID_NONE ) <------------------------------ nop 
-		return;
-	...
-	// add the entity to the KD tree so we will collide against it
-	m_Partition = SpatialPartition()->CreateHandle( this, 
-	PARTITION_CLIENT_SOLID_EDICTS | PARTITION_CLIENT_STATIC_PROPS | 
-	PARTITION_ENGINE_SOLID_EDICTS | PARTITION_ENGINE_STATIC_PROPS, 
-	mins, maxs );
+		Assert( m_Partition == PARTITION_INVALID_HANDLE );
+		if ( m_nSolidType == SOLID_NONE ) return; <------------------------------ nop 
+		
+		...
+
+		// add the entity to the KD tree so we will collide against it
+		m_Partition = SpatialPartition()->CreateHandle( this, 
+		PARTITION_CLIENT_SOLID_EDICTS | PARTITION_CLIENT_STATIC_PROPS | 
+		PARTITION_ENGINE_SOLID_EDICTS | PARTITION_ENGINE_STATIC_PROPS, 
+		mins, maxs );
+	}
 	*/
     GameData hGameData = new GameData("paint_nosolid");
     
