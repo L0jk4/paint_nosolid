@@ -30,7 +30,6 @@ For non-solid static props to be visible to `TR_EnumerateEntities` a patch is re
 
 ## TODO
 - For non-solid world brushes we must get a collision point from somewhere else, which might be a trigger or something else non-solid
-- For non-solid displacements make a patch that would dismiss no ray collision flag when tracing
 - For static props highlighting make a single dynamic prop. When highlighting send dynamic prop's model, origin, size*1.01, color via `sendproxy` to the client. 
 
 ## Open questions
