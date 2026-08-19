@@ -1,3 +1,5 @@
+https://github.com/user-attachments/assets/9d245fb5-caf9-4ea1-a460-658b5616cb4a
+
 # Description
 
 A *proof of concept* SourceMod plugin made with Claude based on my idea. It allows players to paint even on non-solid objects such as triggers, static props, dynamic props, func_brush entities, etc.
@@ -26,7 +28,12 @@ For non-solid static props to be visible to `TR_EnumerateEntities` a patch is re
 
  Automatic save and load are implemented by Claude, which I haven't really checked yet. It should utilise `m_iHammerID` for entities and `m_nHitbox` for static props, which might not be 100% consistent. 
 
-## Open Problems
+## Open questions
 
 - How to highlight a selected static prop for clients?
+- Works for every type of non-solid object?
+- Is save/load consistent?
+
+
+
 
