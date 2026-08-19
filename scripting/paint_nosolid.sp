@@ -408,7 +408,7 @@ void DoPaint( int client )
 	if( prop >= 0 )
 	{
 		// A static prop is not an entity: the decal is addressed to the world
-		// (m_nEntity 0) with the prop index carried in m_nHitbox. Nothing to
+		// (m_nEntity 0) with the prop index equal to m_nHitbox - 1. Nothing to
 		// trace against either, so use the studio placement.
 		float fw[3];
 		GetAngleVectors( angles, fw, NULL_VECTOR, NULL_VECTOR );
