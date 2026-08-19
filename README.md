@@ -28,9 +28,13 @@ For non-solid static props to be visible to `TR_EnumerateEntities` a patch is re
 
  Automatic save and load are implemented by Claude, which I haven't really checked yet. It should utilise `m_iHammerID` for entities and `m_nHitbox` for static props, which might not be 100% consistent. 
 
+## TODO
+- For non-solid world brushes we must get a collision point from somewhere else, which might be a playerclip or a trigger
+- For non-solid displacements make a patch that would dismiss no ray collision flag when tracing
+- For static props highlighting make a single dynamic prop. When highlighting send dynamic prop's model, origin, size*1.01, color via `sendproxy` to the client. 
+
 ## Open questions
 
-- How to highlight a selected static prop for clients?
 - Works for every type of non-solid object?
 - Is save/load consistent?
 
