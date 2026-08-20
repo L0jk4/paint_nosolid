@@ -232,7 +232,6 @@ public void OnPluginStart()
     else
 	{
 		Address addr = hGameData.GetMemSig("CStaticProp::InsertPropIntoKDTree Patch");
-
 		
 		if (addr == Address_Null)
 		{
@@ -245,9 +244,8 @@ public void OnPluginStart()
 			
 			PrintToServer("Patched engine.dll - JZ instruction NOP'd, WINDOWS ONLY!");
 		}
-
-		delete hGameData;
 	}
+    delete hGameData;
 
 	g_hRecords   = new ArrayList( sizeof( PaintRecord ) );
 	g_hEnumList  = new ArrayList();
