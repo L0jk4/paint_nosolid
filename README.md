@@ -14,7 +14,7 @@ For non-solid static props to be visible to `TR_EnumerateEntities` a patch is re
 
  ### Non-solids (target mode)
 
- The plugin utilises `TR_EnumerateEntities` to find entities in front of the client, then they are presented as a list of selectable targets in a menu.
+ The plugin utilises `TR_EnumerateEntities` to find entities in front of the client. Then they are presented as a list of selectable targets in a menu.
 
  After an entity is selected, it flickers via `SetTransmit`, allowing the client to see what they selected (not implemented for static props).
 
@@ -24,11 +24,11 @@ For non-solid static props to be visible to `TR_EnumerateEntities` a patch is re
  
  For studio models decals are projected onto the model's meshes, so `m_vecOrigin` is simply set to a point `g_cvStudioDist` units in front of the player's eyes.
 
- For non-solid displacements patch contents and raytest flag checks when painting.
+ For non-solid displacements I patch out some checks when painting.
 
  ### Save/load
 
- Automatic save and load are implemented by Claude, which I haven't really checked yet. It should utilise `m_iHammerID` for entities and `m_nHitbox` for static props, which might not be 100% consistent. 
+ Automatic save and load are implemented by Claude, which I haven't really checked yet. The plugin utilises `m_iHammerID` for entities and `m_nHitbox` (index) for static props, which should be persistent across map loads. 
 
 ## TODO
 - For non-solid world brushes use `R_LightVec` to get the collision point. Ideally make an extension implementing that pipeline without the original's bloat.  
