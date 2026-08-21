@@ -10,7 +10,7 @@ For non-solid static props to be visible to `TR_EnumerateEntities` a patch is re
  ## Concept
 
  ### Baseline (free aim mode)
- `+paint` command performs a trace forward and sends an `Entity Decal` temporary entity to the client, which works for pretty much everything visible and solid. Additionally I made it hit non-solid displacements by patching a few checks for the duration of painting.
+ `+paint` command performs a trace forward and sends an `Entity Decal` temporary entity to the client, which works for pretty much everything visible and solid. Additionally I made it hit non-solid displacements by patching out a few checks for the duration of painting.
 
  ### Non-solid entities (target mode)
 
