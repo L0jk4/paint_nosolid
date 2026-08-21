@@ -10,9 +10,9 @@ For non-solid static props to be visible to `TR_EnumerateEntities` a patch is re
  ## Concept
 
  ### Baseline (free aim mode)
- `+paint` command performs a trace forward and sends an `Entity Decal` temporary entity to the client, which works for pretty much everything visible and solid.
+ `+paint` command performs a trace forward and sends an `Entity Decal` temporary entity to the client, which works for pretty much everything visible and solid. Additionally I made it hit non-solid displacements by patching a few checks for the duration of painting.
 
- ### Non-solids (target mode)
+ ### Non-solid entities (target mode)
 
  The plugin utilises `TR_EnumerateEntities` to find entities in front of the client. Then they are presented as a list of selectable targets in a menu.
 
@@ -20,19 +20,19 @@ For non-solid static props to be visible to `TR_EnumerateEntities` a patch is re
 
  In target mode, the plugin redirects paint towards the selected entity by overriding `m_nEntity` and `m_nHitbox` in  `Entity Decal`. 
  
- For world and brush models `m_vecOrigin` requires an exact collision point, because the engine finds the surface to paint on by going through the map's BSP tree.  `TR_ClipRayToEntity` allows us to get that for entities, as it doesn't have non-solid flags checks.
+ For brush models and world, `m_vecOrigin` requires an exact collision point, because the engine goes through visual valid surfaces and finds the right one to paint on for the corresponding point in space.  `TR_ClipRayToEntity` allows us to get that for entities, as it doesn't have non-solid flags checks.
  
  For studio models decals are projected onto the model's meshes, so `m_vecOrigin` is simply set to a point `g_cvStudioDist` units in front of the player's eyes.
 
- For non-solid displacements I patch out some checks when painting.
+### Non-solid world (light ray mode)
+Engine's `R_LightVec` function works similar to collision system's `TraceRay`, but it traverses visible surfaces instead. Just like how decals are applied to brushes. With a little kludge I get trace's end position and use it for `m_vecOrigin`.
 
  ### Save/load
 
  Automatic save and load are implemented by Claude, which I haven't really checked yet. The plugin utilises `m_iHammerID` for entities and `m_nHitbox` (index) for static props, which should be persistent across map loads. 
 
 ## TODO
-- For non-solid world brushes use `R_LightVec` to get the collision point. Ideally make an extension implementing that pipeline without the original's bloat.  
-- For static props highlighting make a single dynamic prop. When highlighting send dynamic prop's model, origin, size*1.01, color via `sendproxy` to the client and make it flicker via `SetTransmit`. 
+- For static props highlighting make a single dynamic prop. When highlighting send dynamic prop's model, origin, size*1.01, color via `sendproxy` to the client and make it flicker via `SetTransmit`. (waiting for Mikush to finish his `SendProxy`)
 
 ## Open questions
 
