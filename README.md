@@ -10,7 +10,7 @@ For non-solid static props to be visible to `TR_EnumerateEntities` a patch is re
  ## Concept
 
  ### Baseline (free aim mode)
- `+paint` command performs a trace forward and sends an `Entity Decal` temporary entity to the client, which works for pretty much everything visible and solid that accepts decals. Additionally I made it hit non-solid displacements by patching out a few checks for the duration of painting.
+ `+paint` command performs a `TR_TraceRay` forward and sends an `Entity Decal` temporary entity with hit info to the client, which works for pretty much everything visible and solid that accepts decals. Additionally I made it hit non-solid displacements by patching out a few checks for the duration of painting.
 
  ### Non-solid entities (target mode)
 
@@ -32,7 +32,7 @@ Engine's `R_LightVec` function works similar to collision system's `TraceRay`, b
  Automatic save and load are implemented by Claude. Seemingly everything works. The plugin utilises `m_iHammerID` for entities and `m_nHitbox` (index) for static props, which should be persistent across map loads. 
 
 ## TODO
-- For static props highlighting make a single dynamic prop to mimic them. When highlighting send dynamic prop's model, origin, size*1.01, color via `sendproxy` to the client and make it flicker via `SetTransmit` or color change. (waiting for Mikusch to publish his `SendProxy`). 
+- For static props highlighting make a single dynamic prop to mimic them. When highlighting send dynamic prop's model, origin, size*1.01, color via `sendproxy` to the client and make it flicker via `SetTransmit` or color change. (waiting for Mikusch to publish the ultimate `SendProxy`). 
 
 ## Open questions
 
