@@ -113,6 +113,25 @@ public Plugin myinfo =
 ////////////////////////////////////////////// trace endpoint via R_LightVec ///////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/*
+SurfaceHandle_t R_LightVec (const Vector& start, const Vector& end, bool bUseLightStyles, Vector& c, 
+		float *textureS, float *textureT, float *lightmapS, float *lightmapT ) <------------------ sdkcall
+{   
+	...
+	if( r_visualizelighttraces.GetBool() )                                     <------------------ patch out
+	{
+		if( r_visualizelighttracesshowfulltrace.GetBool() )
+		{
+			CDebugOverlay::AddLineOverlay( start, end, 0, 255, 0, 255, true, -1.0f );
+		}
+		else                                                                   
+		{                                                                     <<< detour, get 2nd arg >>>
+			CDebugOverlay::AddLineOverlay( start, start + ( end - start ) * state.m_HitFrac, 0, 255, 0, 255, true, -1.0f ); 
+		}
+	}
+}
+*/
+
 Handle       g_hSDKCallRLightVec;      // SDKCall handle for R_LightVec
 DynamicDetour g_hDetourAddLineOverlay; // Detour handle for AddLineOverlay
 float R_LightVec_end[3]; // filled in by the AddLineOverlay detour
