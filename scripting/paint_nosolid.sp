@@ -75,8 +75,6 @@ ArrayList g_hRecords;                // of PaintRecord
 ArrayList g_hEnumList;               // scratch list of entity indices along the ray
 ArrayList g_hPropList;               // scratch list of static prop indices along the ray
 
-bool  g_bEnumStatic;                 // which list the enumerate callback fills
-
 int   g_iColour[MAXPLAYERS + 1];
 int   g_iSize[MAXPLAYERS + 1];
 int   g_iTarget[MAXPLAYERS + 1];     // entity reference of the override target, 0 = free aim
@@ -87,9 +85,11 @@ float g_fLastPaint[MAXPLAYERS + 1];
 bool g_LightRayMode;
 
 bool  g_bFlicker;                    // shared flicker state for highlighted entities
-float g_fEnumEye[3];                 // eye position used by the enumerate sort
+float g_vecEyePos[3];                 // eye position used by the enumerate sort
 
 char  g_sMapFile[PLATFORM_MAX_PATH];
+
+#define TR_LENGTH 17000.0
 
 ConVar g_cvEnabled;
 ConVar g_cvInterval;
@@ -108,6 +108,32 @@ public Plugin myinfo =
 	version     = PLUGIN_VERSION,
 	url         = "https://github.com/L0jk4/paint_nosolid"
 };
+
+
+stock void AddPartitionFlagToAllEntities()
+{
+    // Define the flag value (1 << 18)
+    const int EFL_USE_PARTITION_WHEN_NOT_SOLID = (1 << 18);
+    
+    // Get the maximum entity index
+    int maxEntities = GetMaxEntities();
+    
+    // Loop through all entities
+    for (int i = MaxClients + 1; i <= maxEntities; i++)
+    {
+        // Check if entity is valid
+        if (IsValidEntity(i) && IsValidEdict(i))
+        {
+            // Get current EFLags
+            int currentFlags = GetEntProp(i, Prop_Data, "m_iEFlags");
+            
+            // Add the flag (bitwise OR)
+            SetEntProp(i, Prop_Data, "m_iEFlags", currentFlags | EFL_USE_PARTITION_WHEN_NOT_SOLID);
+
+			//CCollisionProperty::UpdateServerPartitionMask to add into the lists
+        }
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////// trace endpoint via R_LightVec ///////////////////////////////////////////////////////
@@ -250,13 +276,6 @@ public MRESReturn Detour_AddLineOverlay(DHookParam hParams)
 	return MRES_Supercede;
 }
 
-bool CloseEnough(float a[3], float b[3], float eps = 1.0e-3)
-{
-	return FloatAbs(a[0] - b[0]) <= eps &&
-		FloatAbs(a[1] - b[1]) <= eps &&
-		FloatAbs(a[2] - b[2]) <= eps;
-}
-
 /**
  * Runs a trace through the engine's R_LightVec and grabs the surface point
  * that gets leaked out through AddLineOverlay().
@@ -334,9 +353,18 @@ void PatchDisplacementTrace(bool unpatch = false)
 
 	if (initialized) 
 	{
-		StoreToAddress(patch1, unpatch ? 0x7A74 : 0x9090, NumberType_Int16);
-		StoreToAddress(patch2, unpatch ? 0x6075 : 0x9090, NumberType_Int16);
-		StoreToAddress(patch3, unpatch ? 0x5774 : 0x9090, NumberType_Int16);
+		if (unpatch)
+		{
+			StoreToAddress(patch1, 0x7A74, NumberType_Int16);
+			StoreToAddress(patch2, 0x6075, NumberType_Int16);
+			StoreToAddress(patch3, 0x5774, NumberType_Int16);
+		}
+		else
+		{
+			StoreToAddress(patch1, 0x9090, NumberType_Int16);
+			StoreToAddress(patch2, 0x9090, NumberType_Int16);
+			StoreToAddress(patch3, 0x9090, NumberType_Int16);
+		}
 		return;
 	}
 
@@ -381,6 +409,7 @@ void PatchDisplacementTrace(bool unpatch = false)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 public void OnPluginStart()
 {
@@ -417,6 +446,7 @@ public void OnPluginStart()
 		}
 		else
 		{
+			// isn't quick enough. gotta restart the map to load static props with the patch applied
 			StoreToAddress(addr, 0x90909090, NumberType_Int32);
 			StoreToAddress(addr + view_as<Address>(4), 0x9090, NumberType_Int16);
 			
@@ -445,7 +475,6 @@ public void OnPluginStart()
 	RegConsoleCmd( "sm_paintmenu",   Command_Menu,       "Open the paint menu"     );
 	RegConsoleCmd( "sm_painttarget", Command_Target,     "Pick an entity to paint on" );
 	RegConsoleCmd( "sm_paintfree",   Command_Free,       "Clear the target entity" );
-	RegConsoleCmd( "sm_paintundo",   Command_Undo,       "Forget your last decal"  );
 	RegConsoleCmd( "sm_paintclear",  Command_Clear,      "Forget all of your decals" );
 
 	RegConsoleCmd( "sm_paintsave", 	 Command_Save,		 "Save this map's decals to disk" );
@@ -454,8 +483,8 @@ public void OnPluginStart()
 
 	HookEvent( "player_spawn", Event_PlayerSpawn );
 
-	CreateTimer( 0.05, Timer_Paint,   _, TIMER_REPEAT);
-	CreateTimer( 0.35, Timer_Flicker, _, TIMER_REPEAT);
+	CreateTimer( 0.05, Timer_Paint,   _, TIMER_REPEAT); // should be a ConVar
+	CreateTimer( 0.35, Timer_Flicker, _, TIMER_REPEAT); // should be a ConVar
 
 	AutoExecConfig( true, "paint" );
 
@@ -705,7 +734,7 @@ void DoPaint( int client )
 			// Brush model: clip the ray against this entity only
 			if( !TraceBrushEntity( target, pos, angles, origin ) )
 			{
-				PrintToChat( client, "\x04[Paint]\x01 You are not aiming at the selected brush." );
+				// PrintToChat( client, "\x04[Paint]\x01 You are not aiming at the selected brush." );
 				return;
 			}
 		}
@@ -722,41 +751,43 @@ void DoPaint( int client )
 	}
 	else
 	{
-		// non-solid world brush
-		if ( g_LightRayMode )
-		{	
+		float lightvec_frac = 1.1;		
+		if (g_LightRayMode)
+		{
 			float fw[3];
 			GetAngleVectors( angles, fw, NULL_VECTOR, NULL_VECTOR );
-			ScaleVector( fw, 17000.0 );
+			ScaleVector( fw, TR_LENGTH );
 			AddVectors( pos, fw, origin );
-			if ( !Call_R_LightVec(pos, origin) )
-				return;
-			origin[0] = R_LightVec_end[0];
-			origin[1] = R_LightVec_end[1];
-			origin[2] = R_LightVec_end[2];
-			hitEnt = 0;
-			hitbox = 0;
-		}
-		else // default TraceRay
-		{
-			PatchDisplacementTrace(false);
-			Handle tr = TR_TraceRayFilterEx( pos, angles, MASK_ALL, RayType_Infinite, TraceFilter_NoPlayers, client );
-			PatchDisplacementTrace(true);
-
-			if( !TR_DidHit( tr ) )
+			if ( Call_R_LightVec(pos, origin) && !CloseEnough(pos, R_LightVec_end)) // frac != 0 might be useless
 			{
-				delete tr;
-				return;
+				float diff[3];
+				SubtractVectors(R_LightVec_end, pos, diff);
+				lightvec_frac = GetVectorLength(diff) / TR_LENGTH;
+				CopyVector(R_LightVec_end, origin);
+				hitEnt = 0;
+				hitbox = 0;
 			}
+		}
 
+		PatchDisplacementTrace(false);
+		Handle tr = TR_TraceRayFilterEx( pos, angles, MASK_ALL, RayType_Infinite, TraceFilter_NoPlayers, client );
+		PatchDisplacementTrace(true);
+
+		if( TR_DidHit( tr ) && !TR_StartSolid() && (TR_GetFraction(tr) < lightvec_frac) )
+		{
 			TR_GetEndPosition( origin, tr );
 			hitEnt = TR_GetEntityIndex( tr );
 			hitbox = TR_GetHitBoxIndex( tr );
 			delete tr;
-
-			if( hitEnt < 0 )
-				hitEnt = 0;
 		}
+		else if (lightvec_frac > 1.0) // both traces failed
+		{
+			delete tr;
+			return;
+		}
+
+		if( hitEnt < 0 ) // why claude
+			hitEnt = 0;
 	}
 
 	int colour = g_iColour[client];
@@ -879,7 +910,6 @@ void ShowMainMenu( int client )
 	Format( buffer, sizeof( buffer ), "Light Ray Mode [%s]", g_LightRayMode ? "X" : "  " );
 	menu.AddItem( "lightray_toggle",  buffer );
 
-	menu.AddItem( "undo",  "Undo last decal" );
 	menu.AddItem( "clear", "Forget all my decals" );
 
 	menu.ExitButton = true;
@@ -915,11 +945,6 @@ public int MenuHandler_Main( Menu menu, MenuAction action, int client, int param
 	{
 		ClearTarget( client );
 		PrintToChat( client, "\x04[Paint]\x01 Target cleared, painting where you aim." );
-		ShowMainMenu( client );
-	}
-	else if( StrEqual( info, "undo" ) )
-	{
-		UndoLast( client );
 		ShowMainMenu( client );
 	}
 	else if( StrEqual( info, "clear" ) )
@@ -1030,19 +1055,25 @@ public Action Command_Free( int client, int args )
 
 void ShowTargetMenu( int client )
 {
-	float angles[3];
-	GetClientEyePosition( client, g_fEnumEye );
+	float angles[3], end[3];
+	GetClientEyePosition( client, g_vecEyePos );
 	GetClientEyeAngles( client, angles );
+	float fw[3];
+	GetAngleVectors( angles, fw, NULL_VECTOR, NULL_VECTOR );
+	ScaleVector( fw, 1000.0 ); // should be a ConVar
+	AddVectors( g_vecEyePos, fw, end );
+	
+	// wont work for entities without EFL_USE_PARTITION_WHEN_NOT_SOLID. Not sure what those are
+	// but worst case scenario add this EFL to all and update their partition with AddPartitionFlagToAllEntities
+	g_hEnumList.Clear();
+	TR_EnumerateEntities( g_vecEyePos, end, PARTITION_NON_STATIC_EDICTS, RayType_EndPoint, EnumCallback_NonStatic );
 
-	CollectEntitiesAlongRay( g_fEnumEye, angles );
 
 	// Static props live in their own partition and are not CBaseEntity, so they
 	// get their own pass: everything this returns is a static prop index by
 	// construction, which is how we sidestep having no way to verify it.
 	g_hPropList.Clear();
-	g_bEnumStatic = true;
-	TR_EnumerateEntities( g_fEnumEye, angles, PARTITION_STATIC_PROPS, RayType_Infinite, EnumCallback_Static );
-	g_bEnumStatic = false;
+	TR_EnumerateEntities( g_vecEyePos, end, PARTITION_STATIC_PROPS, RayType_EndPoint, EnumCallback_Static );
 
 	if( !g_hEnumList.Length && !g_hPropList.Length )
 	{
@@ -1077,7 +1108,7 @@ void ShowTargetMenu( int client )
 			classname,
 			targetname[0] ? " \"" : "", targetname[0] ? targetname : "", targetname[0] ? "\"" : "",
 			model[0] == '*' ? "brush" : "model",
-			GetVectorDistance( g_fEnumEye, center ) );
+			GetVectorDistance( g_vecEyePos, center ) );
 
 		Format( info, sizeof( info ), "e%d", EntIndexToEntRef( entity ) );
 		menu.AddItem( info, display );
@@ -1101,92 +1132,15 @@ void ShowTargetMenu( int client )
 
 public bool EnumCallback_Static( int index, any data )
 {
-	if( g_bEnumStatic && g_hPropList.FindValue( index ) == -1 )
+	if(g_hPropList.FindValue( index ) == -1 )
 		g_hPropList.Push( index );
 
 	return true;
 }
-
-/**
- * TR_EnumerateEntities only reports what the engine put in the spatial
- * partition, and SOLID_NONE entities are usually not in it at all (unless they
- * carry EFL_USE_PARTITION_WHEN_NOT_SOLID). Static props are never reported
- * either - they are not entities. So for the picker we ignore the partition
- * completely and do our own ray/AABB sweep over every entity with a model.
- */
-void CollectEntitiesAlongRay( const float start[3], const float angles[3] )
+public bool EnumCallback_NonStatic( int index, any data )
 {
-	float dir[3], origin[3], mins[3], maxs[3], dist;
-	char  model[PLATFORM_MAX_PATH];
-
-	GetAngleVectors( angles, dir, NULL_VECTOR, NULL_VECTOR );
-	g_hEnumList.Clear();
-
-	int max = GetMaxEntities();
-
-	for( int entity = MaxClients + 1; entity < max; entity++ )
-	{
-		if( !IsValidEntity( entity ) )
-			continue;
-
-		// No model means nothing to paint on (logic entities, relays, ...)
-		GetEntPropString( entity, Prop_Data, "m_ModelName", model, sizeof( model ) );
-		if( !model[0] )
-			continue;
-
-		if( !HasEntProp( entity, Prop_Send, "m_vecMins" ) )
-			continue;
-
-		GetEntPropVector( entity, Prop_Data, "m_vecAbsOrigin", origin );
-		GetEntPropVector( entity, Prop_Send,  "m_vecMins",     mins   );
-		GetEntPropVector( entity, Prop_Send,  "m_vecMaxs",     maxs   );
-
-		// Axis aligned test, plus a little padding for flat/zero sized bounds
-		for( int i = 0; i < 3; i++ )
-		{
-			mins[i] += origin[i] - 4.0;
-			maxs[i] += origin[i] + 4.0;
-		}
-
-		if( RayHitsBox( start, dir, mins, maxs, dist ) )
-			g_hEnumList.Push( entity );
-	}
-}
-
-bool RayHitsBox( const float start[3], const float dir[3], const float mins[3], const float maxs[3], float &dist )
-{
-	float tmin = 0.0;
-	float tmax = 1000000.0;
-
-	for( int i = 0; i < 3; i++ )
-	{
-		if( FloatAbs( dir[i] ) < 0.000001 )
-		{
-			if( start[i] < mins[i] || start[i] > maxs[i] )
-				return false;
-
-			continue;
-		}
-
-		float inv = 1.0 / dir[i];
-		float t1  = ( mins[i] - start[i] ) * inv;
-		float t2  = ( maxs[i] - start[i] ) * inv;
-
-		if( t1 > t2 )
-		{
-			float swap = t1;
-			t1 = t2;
-			t2 = swap;
-		}
-
-		if( t1 > tmin ) tmin = t1;
-		if( t2 < tmax ) tmax = t2;
-
-		if( tmin > tmax )
-			return false;
-	}
-
-	dist = tmin;
+	if (index > MaxClients)
+		g_hEnumList.Push( index );
 	return true;
 }
 
@@ -1198,8 +1152,8 @@ public int SortEnumByDistance( int index1, int index2, Handle array, Handle hndl
 	GetEntityCenter( list.Get( index1 ), a );
 	GetEntityCenter( list.Get( index2 ), b );
 
-	float da = GetVectorDistance( g_fEnumEye, a );
-	float db = GetVectorDistance( g_fEnumEye, b );
+	float da = GetVectorDistance( g_vecEyePos, a );
+	float db = GetVectorDistance( g_vecEyePos, b );
 
 	return ( da > db ) ? 1 : ( ( da < db ) ? -1 : 0 );
 }
@@ -1315,34 +1269,6 @@ int CountDecals( int client )
 	}
 
 	return count;
-}
-
-public Action Command_Undo( int client, int args )
-{
-	if( client )
-		UndoLast( client );
-
-	return Plugin_Handled;
-}
-
-void UndoLast( int client )
-{
-	int userid = GetClientUserId( client );
-
-	PaintRecord rec;
-	for( int i = g_hRecords.Length - 1; i >= 0; i-- )
-	{
-		g_hRecords.GetArray( i, rec );
-
-		if( rec.owner == userid )
-		{
-			g_hRecords.Erase( i );
-			PrintToChat( client, "\x04[Paint]\x01 Last decal forgotten. Type \x03r_cleardecals\x01 in console to refresh your view." );
-			return;
-		}
-	}
-
-	PrintToChat( client, "\x04[Paint]\x01 You have not painted anything yet." );
 }
 
 public Action Command_Clear( int client, int args )
@@ -1692,4 +1618,17 @@ bool HasPaintAccess( int client )
 	int bits = GetUserFlagBits( client );
 
 	return ( bits & ADMFLAG_ROOT ) != 0 || ( bits & FlagToBit( flag ) ) != 0;
+}
+
+bool CloseEnough(float a[3], float b[3], float eps = 1.0e-3)
+{
+	return FloatAbs(a[0] - b[0]) <= eps &&
+		FloatAbs(a[1] - b[1]) <= eps &&
+		FloatAbs(a[2] - b[2]) <= eps;
+}
+
+void CopyVector(float vec_source[3], float vec_destination[3]) {
+	vec_destination[0] = vec_source[0];
+	vec_destination[1] = vec_source[1];
+	vec_destination[2] = vec_source[2];
 }
