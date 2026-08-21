@@ -25,7 +25,7 @@ For non-solid static props to be visible to `TR_EnumerateEntities` a patch is re
  For studio models decals are projected onto the model's meshes, so `m_vecOrigin` is simply set to a point `g_cvStudioDist` units in front of the player's eyes.
 
 ### Non-solid world (light ray mode)
-Engine's `R_LightVec` function works similar to collision system's `TraceRay`, but it traverses visible surfaces instead. Just like how decals are applied to brushes. With a little kludge I get trace's end position and use it for `m_vecOrigin`.
+Engine's `R_LightVec` function works similar to collision system's `TraceRay`, but it traverses visual surfaces instead. Just like how decals are applied to brushes. With a little kludge I get a trace's end position and use it for `m_vecOrigin`.
 
  ### Save/load
 
