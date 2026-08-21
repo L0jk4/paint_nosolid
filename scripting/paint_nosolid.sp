@@ -227,8 +227,15 @@ bool EnsureLightVecInitialized()
 public MRESReturn Detour_AddLineOverlay(DHookParam hParams)
 {
 	hParams.GetVector(2, R_LightVec_end);
-	PrintToChatAll("Detour_AddLineOverlay %f %f %f", R_LightVec_end[0], R_LightVec_end[1], R_LightVec_end[2]);
+	// PrintToChatAll("Detour_AddLineOverlay %f %f %f", R_LightVec_end[0], R_LightVec_end[1], R_LightVec_end[2]);
 	return MRES_Supercede;
+}
+
+bool CloseEnough(float a[3], float b[3], float eps = 1.0e-3)
+{
+	return FloatAbs(a[0] - b[0]) <= eps &&
+		FloatAbs(a[1] - b[1]) <= eps &&
+		FloatAbs(a[2] - b[2]) <= eps;
 }
 
 /**
@@ -244,30 +251,13 @@ public MRESReturn Detour_AddLineOverlay(DHookParam hParams)
  */
 bool Call_R_LightVec(float start[3], float end[3])
 {
-	if (!EnsureLightVecInitialized())
-		return false;
+	if (!EnsureLightVecInitialized()) return false;
 
 	R_LightVec_end = {0.0, 0.0, 0.0};
 	float c[3];
 	SDKCall(g_hSDKCallRLightVec, start, end, false, c, 0, 0, 0, 0);
-	// SDKCall(g_hSDKCallRLightVec, start, end, false, c, texS, texT, lmS, lmT);
 
-	return (R_LightVec_end[0] != 0.0 || R_LightVec_end[1] != 0.0 || R_LightVec_end[2] != 0.0);
-}
-
-public Action Command_rl( int client, int args )
-{
-	PrintToChatAll("rl invoked");
-	float angles[3], pos[3], fw[3], end[3];
-	GetClientEyePosition( client, pos );
-	GetClientEyeAngles( client, angles );
-	GetAngleVectors(angles, fw, NULL_VECTOR, NULL_VECTOR);
-	end[0] = pos[0] + fw[0] * 17000.0;
-	end[1] = pos[1] + fw[1] * 17000.0;
-	end[2] = pos[2] + fw[2] * 17000.0;
-	Call_R_LightVec(pos, end);
-
-	return Plugin_Handled;
+	return !CloseEnough(R_LightVec_end, {0.0, 0.0, 0.0}) && !CloseEnough(R_LightVec_end, end);
 }
 
 
@@ -387,7 +377,7 @@ public void OnPluginStart()
 		// add the entity to the KD tree so we will collide against it
 		m_Partition = SpatialPartition()->CreateHandle( this, 
 		PARTITION_CLIENT_SOLID_EDICTS | PARTITION_CLIENT_STATIC_PROPS | 
-		PARTITION_ENGINE_SOLID_EDICTS | PARTITION_ENGINE_STATIC_PROPS, 
+		PARTITION_ENGINE_SOLID_EDICTS | PARTITION_ENGINE_STATIC_PROPS,   <---------------- might wanna edit this too
 		mins, maxs );
 	}
 	*/
@@ -442,8 +432,6 @@ public void OnPluginStart()
 	RegConsoleCmd( "sm_paintsave", 	 Command_Save,		 "Save this map's decals to disk" );
 	RegConsoleCmd( "sm_paintload", 	 Command_Load,		 "Reload this map's decals from disk" );
 	RegConsoleCmd( "sm_paintwipe", 	 Command_Wipe,		 "Forget every decal on this map" );
-
-	RegConsoleCmd( "sm_rl", Command_rl,"" );
 
 	HookEvent( "player_spawn", Event_PlayerSpawn );
 
