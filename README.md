@@ -27,6 +27,8 @@ For non-solid static props to be visible to `TR_EnumerateEntities` a patch is re
 ### Non-solid world (light ray mode)
 Engine's `R_LightVec` function works similar to collision system's `TraceRay`, but it traverses visual surfaces instead. Just like how decals are applied to brushes. With a little kludge I get a trace's end position and use it for `m_vecOrigin`.
 
+You can combine the default `TR_TraceRay` with `R_LightVec` and pick the one with the lowest fraction, leaving only two modes of +paint. 
+
  ### Save/load
 
  Automatic save and load are implemented by Claude. Seemingly everything works. The plugin utilises `m_iHammerID` for entities and `m_nHitbox` (index) for static props, which should be persistent across map loads. 
