@@ -32,7 +32,7 @@ Engine's `R_LightVec` function works similar to collision system's `TraceRay`, b
  Automatic save and load are implemented by Claude, which I haven't really checked yet. The plugin utilises `m_iHammerID` for entities and `m_nHitbox` (index) for static props, which should be persistent across map loads. 
 
 ## TODO
-- For static props highlighting make a single dynamic prop. When highlighting send dynamic prop's model, origin, size*1.01, color via `sendproxy` to the client and make it flicker via `SetTransmit`. (waiting for Mikusch to publish his `SendProxy`)
+- For static props highlighting make a single dynamic prop to mimic them. When highlighting send dynamic prop's model, origin, size*1.01, color via `sendproxy` to the client and make it flicker via `SetTransmit` or color change. (waiting for Mikusch to publish his `SendProxy`)
 
 ## Open questions
 
