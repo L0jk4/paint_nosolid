@@ -2,7 +2,7 @@ https://github.com/user-attachments/assets/9d245fb5-caf9-4ea1-a460-658b5616cb4a
 
 # Description
 
-A *proof of concept* SourceMod plugin made with Claude based on my findings. It allows players to paint even on non-solid objects such as displacements, triggers, static props, dynamic props, func_brush entities, etc.
+A *proof of concept* SourceMod plugin made with Claude based on my findings. It allows players to paint even on non-solid objects such as displacements, triggers, static props, dynamic props, func_brush entities, etc. Readme written solely by me.
 
 ## Note
 For non-solid static props to be visible to `TR_EnumerateEntities` a patch is required, which is implemented only for x86 Windows Counter-Strike: Source (as all the other patches and signatures). It shouldn't have a significant impact on server performance, since they will still be filtered out rather early in the collision pipeline. If it still bothers somebody, you can detour the whole function and insert such props without solid_edict flag.
@@ -10,7 +10,7 @@ For non-solid static props to be visible to `TR_EnumerateEntities` a patch is re
  ## Concept
 
  ### Baseline (free aim mode)
- `+paint` command performs a trace forward and sends an `Entity Decal` temporary entity to the client, which works for pretty much everything visible and solid. Additionally I made it hit non-solid displacements by patching out a few checks for the duration of painting.
+ `+paint` command performs a trace forward and sends an `Entity Decal` temporary entity to the client, which works for pretty much everything visible and solid that accepts decals. Additionally I made it hit non-solid displacements by patching out a few checks for the duration of painting.
 
  ### Non-solid entities (target mode)
 
