@@ -21,6 +21,7 @@
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
+#include <dhooks>
 
 #define PLUGIN_VERSION      "1.0.0"
 
@@ -83,6 +84,7 @@ int   g_iTargetProp[MAXPLAYERS + 1]; // static prop index of the override target
 bool  g_bPainting[MAXPLAYERS + 1];
 bool  g_bSynced[MAXPLAYERS + 1];
 float g_fLastPaint[MAXPLAYERS + 1];
+bool g_LightRayMode;
 
 bool  g_bFlicker;                    // shared flicker state for highlighted entities
 float g_fEnumEye[3];                 // eye position used by the enumerate sort
@@ -107,7 +109,171 @@ public Plugin myinfo =
 	url         = "https://github.com/L0jk4/paint_nosolid"
 };
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////// trace endpoint via R_LightVec ///////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+Handle       g_hSDKCallRLightVec;      // SDKCall handle for R_LightVec
+DynamicDetour g_hDetourAddLineOverlay; // Detour handle for AddLineOverlay
+float R_LightVec_end[3]; // filled in by the AddLineOverlay detour
+
+/**
+ * Sets up the SDKCall for R_LightVec and the AddLineOverlay detour.
+ * Safe to call multiple times; only does real work once.
+ *
+ * @return True if both the SDKCall and the detour are ready to use.
+ */
+bool EnsureLightVecInitialized()
+{
+	static bool tried_to_initialize, initialized;
+
+	if (tried_to_initialize)
+		return initialized;
+
+	tried_to_initialize = true;
+
+	GameData hGameConf = new GameData("paint_nosolid");
+	if (hGameConf == null)
+	{
+		PrintToServer("Call_R_LightVec: couldn't load gamedata \"%s\"", "paint_nosolid");
+		return false;
+	}
+
+	// SurfaceHandle_t R_LightVec (const Vector& start, const Vector& end, bool bUseLightStyles, Vector& c, 
+	//	float *textureS, float *textureT, float *lightmapS, float *lightmapT )
+	StartPrepSDKCall(SDKCall_Static);
+	if (!PrepSDKCall_SetFromConf(hGameConf, SDKConf_Signature, "R_LightVec"))
+	{
+		PrintToServer("Call_R_LightVec: failed to find signature for R_LightVec");
+		delete hGameConf;
+		return false;
+	}
+
+	PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);  // SurfaceHandle_t (unused)
+	PrepSDKCall_AddParameter(SDKType_Vector, SDKPass_ByRef);         // const Vector &start
+	PrepSDKCall_AddParameter(SDKType_Vector, SDKPass_ByRef);         // const Vector &end
+	PrepSDKCall_AddParameter(SDKType_Bool, SDKPass_Plain);           // bool bUseLightStyles
+	PrepSDKCall_AddParameter(SDKType_Vector, SDKPass_ByRef);         // Vector &c            (unused out)
+	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Pointer); // float *textureS      (unused out)
+	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Pointer); // float *textureT      (unused out)
+	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Pointer); // float *lightmapS     (unused out)
+	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Pointer); // float *lightmapT     (unused out)
+
+	g_hSDKCallRLightVec = EndPrepSDKCall();
+	if (g_hSDKCallRLightVec == null)
+	{
+		PrintToServer("Call_R_LightVec: failed to create SDKCall for R_LightVec");
+		delete hGameConf;
+		return false;
+	}
+
+	// crashed on my test map for some reason. And we don't need to check disps anyway
+	Address addr1 = hGameConf.GetMemSig("R_LightVec AddDisplacementsInLeafToTestList call patch");
+	if (addr1 == Address_Null)
+	{
+		PrintToServer("Failed to find signature 'R_LightVec AddDisplacementsInLeafToTestList call patch'");
+		delete hGameConf;
+		return false;
+	}
+	StoreToAddress(addr1, 0x90909090, NumberType_Int32);
+	StoreToAddress(addr1 + view_as<Address>(4), 0x90, NumberType_Int8);
+	
+	// so that we get to AddLineOverlay
+	Address addr2 = hGameConf.GetMemSig("R_LightVec r_visualizelighttraces check patch");
+	if (addr2 == Address_Null)
+	{
+		PrintToServer("Failed to find signature 'R_LightVec r_visualizelighttraces check patch'");
+		delete hGameConf;
+		return false;
+	}
+	StoreToAddress(addr2, 0x90909090, NumberType_Int32);
+	StoreToAddress(addr2 + view_as<Address>(4), 0x9090, NumberType_Int16);
+
+	// void AddLineOverlay(const Vector& origin, const Vector& dest, int r, int g, int b, int a, bool noDepthTest, float flDuration)
+	g_hDetourAddLineOverlay = new DynamicDetour(Address_Null, CallConv_CDECL, ReturnType_Void, ThisPointer_Ignore);
+	if (g_hDetourAddLineOverlay == null ||
+	    !g_hDetourAddLineOverlay.SetFromConf(hGameConf, SDKConf_Signature, "CDebugOverlay::AddLineOverlay"))
+	{
+		PrintToServer("Call_R_LightVec: failed to find signature for CDebugOverlay::AddLineOverlay");
+		delete hGameConf;
+		return false;
+	}
+
+	g_hDetourAddLineOverlay.AddParam(HookParamType_VectorPtr); // const Vector &origin
+	g_hDetourAddLineOverlay.AddParam(HookParamType_VectorPtr); // const Vector &dest
+	g_hDetourAddLineOverlay.AddParam(HookParamType_Int);       // int r
+	g_hDetourAddLineOverlay.AddParam(HookParamType_Int);       // int g
+	g_hDetourAddLineOverlay.AddParam(HookParamType_Int);       // int b
+	g_hDetourAddLineOverlay.AddParam(HookParamType_Int);       // int a
+	g_hDetourAddLineOverlay.AddParam(HookParamType_Bool);      // bool noDepthTest
+	g_hDetourAddLineOverlay.AddParam(HookParamType_Float);     // float flDuration
+
+	if (!g_hDetourAddLineOverlay.Enable(Hook_Pre, Detour_AddLineOverlay))
+	{
+		PrintToServer("Call_R_LightVec: failed to enable AddLineOverlay detour");
+		delete hGameConf;
+		return false;
+	}
+
+	delete hGameConf;
+	initialized = true;
+	return true;
+}
+
+// Pre-detour on AddLineOverlay: grab "dest" (param 2) and supercede so the
+// real function never runs.
+// NOTE: while this detour is enabled it blocks *every* call to
+// AddLineOverlay, not just ones coming from R_LightVec's internal trace.
+public MRESReturn Detour_AddLineOverlay(DHookParam hParams)
+{
+	hParams.GetVector(2, R_LightVec_end);
+	PrintToChatAll("Detour_AddLineOverlay %f %f %f", R_LightVec_end[0], R_LightVec_end[1], R_LightVec_end[2]);
+	return MRES_Supercede;
+}
+
+/**
+ * Runs a trace through the engine's R_LightVec and grabs the surface point
+ * that gets leaked out through AddLineOverlay().
+ *
+ * @param start   Trace start position.
+ * @param end     Trace end position.
+ * @param result  Filled with the captured vector on success.
+ * @return        True if a non-zero vector was captured from
+ *                AddLineOverlay; false if setup failed or nothing was
+ *                captured.
+ */
+bool Call_R_LightVec(float start[3], float end[3])
+{
+	if (!EnsureLightVecInitialized())
+		return false;
+
+	R_LightVec_end = {0.0, 0.0, 0.0};
+	float c[3];
+	SDKCall(g_hSDKCallRLightVec, start, end, false, c, 0, 0, 0, 0);
+	// SDKCall(g_hSDKCallRLightVec, start, end, false, c, texS, texT, lmS, lmT);
+
+	return (R_LightVec_end[0] != 0.0 || R_LightVec_end[1] != 0.0 || R_LightVec_end[2] != 0.0);
+}
+
+public Action Command_rl( int client, int args )
+{
+	PrintToChatAll("rl invoked");
+	float angles[3], pos[3], fw[3], end[3];
+	GetClientEyePosition( client, pos );
+	GetClientEyeAngles( client, angles );
+	GetAngleVectors(angles, fw, NULL_VECTOR, NULL_VECTOR);
+	end[0] = pos[0] + fw[0] * 17000.0;
+	end[1] = pos[1] + fw[1] * 17000.0;
+	end[2] = pos[2] + fw[2] * 17000.0;
+	Call_R_LightVec(pos, end);
+
+	return Plugin_Handled;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////// displacements patches ////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /*
 template <bool IS_POINT>
@@ -205,6 +371,8 @@ void PatchDisplacementTrace(bool unpatch = false)
 	}
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 public void OnPluginStart()
 {
 	// patch CStaticProp::InsertPropIntoKDTree
@@ -271,9 +439,11 @@ public void OnPluginStart()
 	RegConsoleCmd( "sm_paintundo",   Command_Undo,       "Forget your last decal"  );
 	RegConsoleCmd( "sm_paintclear",  Command_Clear,      "Forget all of your decals" );
 
-	RegAdminCmd( "sm_paintsave", Command_Save, ADMFLAG_GENERIC, "Save this map's decals to disk" );
-	RegAdminCmd( "sm_paintload", Command_Load, ADMFLAG_GENERIC, "Reload this map's decals from disk" );
-	RegAdminCmd( "sm_paintwipe", Command_Wipe, ADMFLAG_GENERIC, "Forget every decal on this map" );
+	RegConsoleCmd( "sm_paintsave", 	 Command_Save,		 "Save this map's decals to disk" );
+	RegConsoleCmd( "sm_paintload", 	 Command_Load,		 "Reload this map's decals from disk" );
+	RegConsoleCmd( "sm_paintwipe", 	 Command_Wipe,		 "Forget every decal on this map" );
+
+	RegConsoleCmd( "sm_rl", Command_rl,"" );
 
 	HookEvent( "player_spawn", Event_PlayerSpawn );
 
@@ -545,23 +715,41 @@ void DoPaint( int client )
 	}
 	else
 	{
-		PatchDisplacementTrace(false);
-		Handle tr = TR_TraceRayFilterEx( pos, angles, MASK_ALL, RayType_Infinite, TraceFilter_NoPlayers, client );
-		PatchDisplacementTrace(true);
-
-		if( !TR_DidHit( tr ) )
-		{
-			delete tr;
-			return;
-		}
-
-		TR_GetEndPosition( origin, tr );
-		hitEnt = TR_GetEntityIndex( tr );
-		hitbox = TR_GetHitBoxIndex( tr );
-		delete tr;
-
-		if( hitEnt < 0 )
+		// non-solid world brush
+		if ( g_LightRayMode )
+		{	
+			float fw[3];
+			GetAngleVectors( angles, fw, NULL_VECTOR, NULL_VECTOR );
+			ScaleVector( fw, 17000.0 );
+			AddVectors( pos, fw, origin );
+			if ( !Call_R_LightVec(pos, origin) )
+				return;
+			origin[0] = R_LightVec_end[0];
+			origin[1] = R_LightVec_end[1];
+			origin[2] = R_LightVec_end[2];
 			hitEnt = 0;
+			hitbox = 0;
+		}
+		else // default TraceRay
+		{
+			PatchDisplacementTrace(false);
+			Handle tr = TR_TraceRayFilterEx( pos, angles, MASK_ALL, RayType_Infinite, TraceFilter_NoPlayers, client );
+			PatchDisplacementTrace(true);
+
+			if( !TR_DidHit( tr ) )
+			{
+				delete tr;
+				return;
+			}
+
+			TR_GetEndPosition( origin, tr );
+			hitEnt = TR_GetEntityIndex( tr );
+			hitbox = TR_GetHitBoxIndex( tr );
+			delete tr;
+
+			if( hitEnt < 0 )
+				hitEnt = 0;
+		}
 	}
 
 	int colour = g_iColour[client];
@@ -680,6 +868,10 @@ void ShowMainMenu( int client )
 	menu.AddItem( "target", buffer );
 
 	menu.AddItem( "free",  "Clear target (free aim)" );
+
+	Format( buffer, sizeof( buffer ), "Light Ray Mode [%s]", g_LightRayMode ? "X" : "  " );
+	menu.AddItem( "lightray_toggle",  buffer );
+
 	menu.AddItem( "undo",  "Undo last decal" );
 	menu.AddItem( "clear", "Forget all my decals" );
 
@@ -707,6 +899,11 @@ public int MenuHandler_Main( Menu menu, MenuAction action, int client, int param
 		ShowSizeMenu( client );
 	else if( StrEqual( info, "target" ) )
 		ShowTargetMenu( client );
+	else if( StrEqual( info, "lightray_toggle" ) )
+	{
+		g_LightRayMode = !g_LightRayMode;
+		ShowMainMenu( client );
+	}
 	else if( StrEqual( info, "free" ) )
 	{
 		ClearTarget( client );
