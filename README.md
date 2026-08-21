@@ -1,11 +1,11 @@
 https://github.com/user-attachments/assets/9d245fb5-caf9-4ea1-a460-658b5616cb4a
 
-# Description
+## Description
 
 A *proof of concept* SourceMod plugin made with Claude based on my findings. It allows players to paint even on non-solid objects such as displacements, triggers, static props, dynamic props, func_brush entities, etc. Readme written solely by me.
 
 ## Note
-For non-solid static props to be visible to `TR_EnumerateEntities` a patch is required, which is implemented only for x86 Windows Counter-Strike: Source (as all the other patches and signatures). It shouldn't have a significant impact on server performance, since they will still be filtered out rather early in the collision pipeline. If it still bothers somebody, you can detour the whole function and insert such props without solid_edict flag.
+For non-solid static props to be visible to `TR_EnumerateEntities` a patch is required, which is implemented only for x86 Windows Counter-Strike: Source (as all the other patches and signatures). It shouldn't have a significant impact on server performance, since they will still be filtered out rather early in the collision pipeline. Alternatively you could detour the whole function and insert such props without solid_edict flag.
 
  ## Concept
 
@@ -29,10 +29,10 @@ Engine's `R_LightVec` function works similar to collision system's `TraceRay`, b
 
  ### Save/load
 
- Automatic save and load are implemented by Claude, which I haven't really checked yet. The plugin utilises `m_iHammerID` for entities and `m_nHitbox` (index) for static props, which should be persistent across map loads. 
+ Automatic save and load are implemented by Claude. Seemingly everything works. The plugin utilises `m_iHammerID` for entities and `m_nHitbox` (index) for static props, which should be persistent across map loads. 
 
 ## TODO
-- For static props highlighting make a single dynamic prop to mimic them. When highlighting send dynamic prop's model, origin, size*1.01, color via `sendproxy` to the client and make it flicker via `SetTransmit` or color change. (waiting for Mikusch to publish his `SendProxy`)
+- For static props highlighting make a single dynamic prop to mimic them. When highlighting send dynamic prop's model, origin, size*1.01, color via `sendproxy` to the client and make it flicker via `SetTransmit` or color change. (waiting for Mikusch to publish his `SendProxy`). 
 
 ## Open questions
 
