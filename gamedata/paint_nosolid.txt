@@ -26,6 +26,27 @@
                 "library"    "engine"
                 "windows"    "\x74\x57\x8B\x75\x10"
             }
+            
+            "R_LightVec"
+            {
+                "library"    "engine"
+                "windows"    "\x53\x8B\xDC\x83\xEC\x08\x83\xE4\xF0\x83\xC4\x04\x55\x8B\x6B\x04\x89\x6C\x24\x04\x8B\xEC\xA1\x2A\x2A\x2A\x2A\x81\xEC\xB8"
+            }            
+            "R_LightVec AddDisplacementsInLeafToTestList call patch"
+            {
+                "library"    "engine"
+                "windows"    "\xE8\x2A\x2A\x2A\x2A\xA1\x2A\x2A\x2A\x2A\x83\xC4\x08\x0F\xB7\x4F\x34"
+            }
+            "R_LightVec r_visualizelighttraces check patch"
+            {
+                "library"    "engine"
+                "windows"    "\x0F\x84\x84\x00\x00\x00\xD9\x05"
+            }
+            "CDebugOverlay::AddLineOverlay"
+            {
+                "library"    "engine"
+                "windows"    "\x55\x8B\xEC\x83\xEC\x20\xB9\x2A\x2A\x2A\x2A\xE8\x2A\x2A\x2A\x2A\x84\xC0\x0F\x85\xFE"
+            }
         }
     }
 }
